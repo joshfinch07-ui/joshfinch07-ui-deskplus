@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -32,9 +32,42 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Ensure Pages site exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          if gh api "repos/${GITHUB_REPOSITORY}/pages"; then
+            echo "Pages site already exists"
+            exit 0
+          fi
+          echo "Creating Pages site with GitHub Actions source"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
+            -H "Accept: application/vnd.github+json" \
+            -f build_type=workflow
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "Workflow-source create failed; trying branch source then switching"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" \
+              -H "Accept: application/vnd.github+json" \
+              -f source[branch]=main \
+              -f source[path]='/'
+            status=$?
+          fi
+          if [ $status -ne 0 ]; then
+            echo "Could not create Pages site with GITHUB_TOKEN"
+            exit 1
+          fi
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/pages" \
+            -H "Accept: application/vnd.github+json" \
+            -f build_type=workflow || true
+      - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
