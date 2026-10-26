@@ -3,6 +3,8 @@ import { format, parse } from 'date-fns';
 import type { Proposal, ProposalStatus, Simulation, SimulationStatus } from '../types';
 import { useStore } from '../store/StoreContext';
 import { BriefChip } from '../components/EmailBrief';
+import { EmailSendActions } from '../components/EmailSendActions';
+import { draftFromBrief, emailSubject } from '../utils/emailDraft';
 import { ProposalForm, SimulationForm, PROPOSAL_STATUSES, SIM_STATUSES, nextMonthOf } from '../components/ProposalForms';
 import { Toast } from '../components/Toast';
 import { resolveProposal, resolveSimulation, TYPE_ICON } from '../utils/brief';
@@ -183,6 +185,12 @@ export function ProposalsSimsView({
                 </span>
                 <span className="c-chip">
                   {open ? <BriefChip brief={resolveProposal(data, p)} onClick={() => setEditP(p)} /> : null}
+                  {open && resolveProposal(data, p).type === 'email' ? (
+                    <EmailSendActions
+                      draft={draftFromBrief(resolveProposal(data, p), emailSubject(p.company, 'proposal'))}
+                      label={p.company}
+                    />
+                  ) : null}
                   {m ? (
                     <button type="button" className="meeting-chip" onClick={() => onOpenMeeting(m.id)} title="Open the meeting">
                       📅 {formatDisplay(m.meetingDate)}
@@ -269,7 +277,15 @@ export function ProposalsSimsView({
                       </select>
                     </span>
                     <span className="c-fu">{s.followUpDate && open ? `${TYPE_ICON[s.followUpType ?? 'email']} ${formatDisplay(s.followUpDate)}` : '—'}</span>
-                    <span className="c-chip">{open ? <BriefChip brief={resolveSimulation(data, s)} onClick={() => setEditS(s)} /> : null}</span>
+                    <span className="c-chip">
+                      {open ? <BriefChip brief={resolveSimulation(data, s)} onClick={() => setEditS(s)} /> : null}
+                      {open && resolveSimulation(data, s).type === 'email' ? (
+                        <EmailSendActions
+                          draft={draftFromBrief(resolveSimulation(data, s), emailSubject(s.company, 'sim'))}
+                          label={s.company}
+                        />
+                      ) : null}
+                    </span>
                     <span className="c-act">
                       {rolledTo ? (
                         <span className="mini-tag" title="Already rolled">→ {rolledTo.month}</span>

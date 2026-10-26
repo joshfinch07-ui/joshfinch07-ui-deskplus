@@ -2,6 +2,8 @@ import { useMemo, useState, type ReactNode } from 'react';
 import type { ColdLead, Proposal, Prospect, Simulation, Task, TradeIdea } from '../types';
 import { useStore, type BriefKind } from '../store/StoreContext';
 import { BriefChip, BriefModal, type BriefValue } from '../components/EmailBrief';
+import { EmailSendActions } from '../components/EmailSendActions';
+import { draftFromBrief, emailSubject, type SubjectKind } from '../utils/emailDraft';
 import { DonePopover, type DoneChoice, type GroupPart } from '../components/DonePopover';
 import { Toast } from '../components/Toast';
 import { linkedDueTasks, recentlyCompleted, type DoneInput, type DoneKind, type OutcomeKind, type UndoToken } from '../store/done';
@@ -42,6 +44,29 @@ const PART_LABEL: Record<string, string> = {
   proposal: 'proposal follow-up',
   simulation: 'sim follow-up',
 };
+
+function subjectFor(f: FollowUpItem): string {
+  if (f.kind === 'task') {
+    const kind: SubjectKind = f.item.kind === 'confirmation-email' ? 'confirmation' : 'follow-up';
+    return emailSubject(f.item.relatedCompany || '', kind);
+  }
+  if (f.kind === 'proposal') return emailSubject(f.item.company, 'proposal');
+  if (f.kind === 'simulation') return emailSubject(f.item.company, 'sim');
+  if (f.kind === 'trade') return emailSubject(f.item.client, 'follow-up');
+  return emailSubject(f.item.company, 'follow-up');
+}
+
+function inheritedBrief(p: Prospect | undefined): BriefValue | undefined {
+  if (!p) return undefined;
+  return {
+    contactName: p.contact,
+    contactEmail: p.contactEmail,
+    contactPhone: p.contactPhone,
+    briefWhat: p.briefWhat,
+    briefHow: p.briefHow,
+    followUpType: p.followUpType,
+  };
+}
 
 function ReminderSection({
   title,
@@ -89,6 +114,9 @@ export function TodayView({
     initial: BriefValue;
     inheritHint?: string;
     inheritedType?: FollowUpType;
+    inherited?: BriefValue;
+    subject?: string;
+    contactName?: string;
   } | null>(null);
   const [doneFor, setDoneForState] = useState<{ f: FollowUpItem; outcome: OutcomeKind } | null>(null);
   const setDoneFor = (f: FollowUpItem | null, outcome: OutcomeKind = 'done') =>
@@ -238,6 +266,8 @@ export function TodayView({
         id: p.id,
         title: `Email brief — ${p.company}`,
         initial: { followUpType: p.followUpType ?? 'email', contactName: p.contact, contactEmail: p.contactEmail, contactPhone: p.contactPhone, briefWhat: p.briefWhat, briefHow: p.briefHow },
+        subject: emailSubject(p.company, 'follow-up'),
+        contactName: p.contact,
       });
     } else if (f.kind === 'coldlead') {
       const c = f.item;
@@ -246,6 +276,8 @@ export function TodayView({
         id: c.id,
         title: `Email brief — ${c.company}`,
         initial: { followUpType: c.followUpType ?? 'email', contactName: c.contactName, contactEmail: c.contactEmail, contactPhone: c.contactPhone, briefWhat: c.briefWhat, briefHow: c.briefHow },
+        subject: emailSubject(c.company, 'follow-up'),
+        contactName: c.contactName,
       });
     } else if (f.kind === 'proposal' || f.kind === 'simulation') {
       const it = f.item;
@@ -263,6 +295,8 @@ export function TodayView({
           briefHow: it.briefHow,
         },
         inheritedType: hub?.followUpType ?? 'email',
+        inherited: inheritedBrief(hub),
+        subject: emailSubject(it.company, f.kind === 'proposal' ? 'proposal' : 'sim'),
         inheritHint: hub
           ? `Blank fields use ${hub.company}’s contact and brief (the pipeline card is the hub).`
           : 'Not linked to a pipeline prospect — link it in Proposals & Sims.',
@@ -270,6 +304,9 @@ export function TodayView({
     } else {
       const it = f.item;
       const isTrade = f.kind === 'trade';
+      const linked = isTrade
+        ? findProspect(data, f.item.prospectId, f.item.client)
+        : findProspect(data, f.item.relatedProspectId, f.item.relatedCompany);
       setBriefEdit({
         kind: isTrade ? 'trade' : 'task',
         id: it.id,
@@ -283,6 +320,8 @@ export function TodayView({
           briefHow: it.briefHow,
         },
         inheritedType: isTrade ? 'email' : typeOfTask(f.item),
+        inherited: inheritedBrief(linked),
+        subject: subjectFor(f),
         inheritHint: 'Blank fields fall back to the linked prospect’s contact and brief.',
       });
     }
@@ -347,10 +386,17 @@ export function TodayView({
     );
   };
 
+  const sendFor = (f: FollowUpItem, label = itemTitle(f)) => {
+    const brief = briefFor(f);
+    if (brief.type !== 'email') return null;
+    return <EmailSendActions draft={draftFromBrief(brief, subjectFor(f))} label={label} />;
+  };
+
   const chip = (f: FollowUpItem) => (
     <>
       {attemptChip(f)}
       <BriefChip brief={briefFor(f)} onClick={() => openBrief(f)} />
+      {sendFor(f)}
       {doneBtn(f)}
       {noAnswerBtn(f)}
     </>
@@ -517,12 +563,16 @@ export function TodayView({
                 <button type="button" className="link-btn" onClick={() => setDoneFor(p)} title="Handle just this part">
                   just this
                 </button>
+                {p.item.id === hubPart.item.id ? null : sendFor(p, `${row.company} ${PART_LABEL[p.kind] ?? p.kind}`)}
               </div>
             ))}
           </div>
         </div>
         {maxAttempts ? <span className="attempt-chip">Attempt {maxAttempts + 1}</span> : null}
         <BriefChip brief={hb} onClick={() => (row.prospect ? openBrief({ kind: 'prospect', item: row.prospect, due: row.due }) : openBrief(hubPart))} />
+        {hb.type === 'email' ? (
+          <EmailSendActions draft={draftFromBrief(hb, emailSubject(row.company, 'follow-up'))} label={row.company} />
+        ) : null}
         <button type="button" className={`btn btn-sm done-btn done-${hb.type}`} onClick={() => setGroupFor({ row, outcome: 'done' })}>
           {briefLabels(hb.type).done} all
         </button>
@@ -908,7 +958,10 @@ export function TodayView({
           title={briefEdit.title}
           initial={briefEdit.initial}
           inheritedType={briefEdit.inheritedType}
+          inherited={briefEdit.inherited}
           inheritHint={briefEdit.inheritHint}
+          subject={briefEdit.subject}
+          contactName={briefEdit.contactName}
           defaultStyle={data.settings?.defaultEmailStyle}
           onSave={(v) => updateBrief(briefEdit.kind, briefEdit.id, v)}
           onClose={() => setBriefEdit(null)}

@@ -7,6 +7,7 @@ import { SegControl } from './SegControl';
 import { DateInput } from './DateInput';
 import { useStore } from '../store/StoreContext';
 import { EmailBriefFields, TypeToggle, type BriefValue } from './EmailBrief';
+import { emailSubject } from '../utils/emailDraft';
 
 const TEMPS: Temperature[] = ['Cold', 'Warm', 'Hot'];
 const PRIOS: Priority[] = [1, 2, 3, 4, 5];
@@ -243,6 +244,8 @@ export function ProspectForm({
       <EmailBriefFields
         hideContact
         value={brief}
+        contactName={contact}
+        subject={emailSubject(company, 'follow-up')}
         onChange={(patch) => setBrief((b) => ({ ...b, ...patch }))}
         defaultStyle={data.settings?.defaultEmailStyle}
       />

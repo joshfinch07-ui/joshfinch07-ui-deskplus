@@ -5,6 +5,7 @@ import { nearProspects, prospectByName, searchProspects } from '../utils/company
 import { formatDisplay, todayISO } from '../utils/dates';
 import { DateInput } from './DateInput';
 import { EmailBriefFields, TypeToggle, type BriefValue } from './EmailBrief';
+import { emailSubject } from '../utils/emailDraft';
 import { Modal } from './Modal';
 
 export const PROPOSAL_STATUSES: ProposalStatus[] = ['Sent', 'Discussing', 'Won', 'Lost', 'Parked'];
@@ -256,6 +257,7 @@ export function ProposalForm({
         compact
         inherited={inherited}
         inheritedType={p?.followUpType}
+        subject={emailSubject(v.company || p?.company || '', 'proposal')}
         defaultStyle={data.settings?.defaultEmailStyle}
         inheritHint={p ? `Leave blank to use ${p.company}’s contact and brief (shown greyed). Fill a field only to override it for this proposal.` : undefined}
       />
@@ -375,6 +377,7 @@ export function SimulationForm({
         compact
         inherited={inherited}
         inheritedType={p?.followUpType}
+        subject={emailSubject(v.company || p?.company || '', 'sim')}
         defaultStyle={data.settings?.defaultEmailStyle}
         inheritHint={p ? `Leave blank to use ${p.company}’s contact and brief. Fill a field only to override it for this sim.` : undefined}
       />

@@ -1594,3 +1594,50 @@ select.cold-col-type {
 .prospect-card.docs-sent { border-color: #34d399; box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.35); }
 .docs-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: rgba(52, 211, 153, 0.15); color: #34d399; }
 .booked-group { margin-bottom: 10px; }
+
+.send-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  align-self: center;
+}
+.send-btn {
+  font-size: 0.85rem;
+  padding: 1px 5px;
+  line-height: 1.2;
+}
+.send-btn.warn {
+  color: #fcd34d;
+}
+.send-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+.send-inline .warn-line {
+  flex: 1 0 100%;
+  margin: 0;
+  color: #fcd34d;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.send-inline .tone-line {
+  flex: 1 0 100%;
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.mail-client {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+.mail-client label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import type { ColdLead, ColdLeadStatus, FollowUpType } from '../types';
-import { TYPE_ICON, briefState, resolveColdLead } from '../utils/brief';
+import { TYPE_ICON, briefState, resolveColdLead, type ResolvedBrief } from '../utils/brief';
 import { useStore } from '../store/StoreContext';
 import { formatDisplay, isDueToday, isOverdue, todayISO } from '../utils/dates';
 import { DateInput } from '../components/DateInput';
 import { EmailBriefFields } from '../components/EmailBrief';
+import { EmailSendActions } from '../components/EmailSendActions';
+import { draftFromBrief, emailSubject } from '../utils/emailDraft';
 
 const STATUS_FILTERS: Array<ColdLeadStatus | 'All'> = ['Open', 'Parked', 'Done', 'All'];
 
@@ -157,6 +159,7 @@ export function ColdLeadsView() {
               onToggleEdit={() => setEditingId(editingId === c.id ? null : c.id)}
               onPatch={patch}
               ready={briefState(resolveColdLead(data, c))}
+              brief={resolveColdLead(data, c)}
               defaultStyle={data.settings?.defaultEmailStyle}
               onStatus={setColdLeadStatus}
               onDelete={() => {
@@ -178,6 +181,7 @@ function ColdLeadRow({
   onToggleEdit,
   onPatch,
   ready,
+  brief,
   defaultStyle,
   onStatus,
   onDelete,
@@ -187,6 +191,7 @@ function ColdLeadRow({
   onToggleEdit: () => void;
   onPatch: (id: string, field: keyof ColdLead, value: string | null) => void;
   ready: 'ready' | 'no-contact' | 'no-brief';
+  brief: ResolvedBrief;
   defaultStyle?: string;
   onStatus: (id: string, status: ColdLeadStatus) => void;
   onDelete: () => void;
@@ -258,6 +263,8 @@ function ColdLeadRow({
         <EmailBriefFields
           compact
           value={lead}
+          contactName={lead.contactName}
+          subject={emailSubject(lead.company, 'follow-up')}
           defaultStyle={defaultStyle}
           onChange={(p) => {
             for (const [k, v] of Object.entries(p)) onPatch(lead.id, k as keyof ColdLead, v ?? '');
@@ -299,6 +306,9 @@ function ColdLeadRow({
         {lead.notes || '—'}
       </span>
       <div className="cold-col-actions">
+        {brief.type === 'email' ? (
+          <EmailSendActions draft={draftFromBrief(brief, emailSubject(lead.company, 'follow-up'))} label={lead.company || 'cold lead'} />
+        ) : null}
         <button
           type="button"
           className="btn btn-ghost btn-sm"

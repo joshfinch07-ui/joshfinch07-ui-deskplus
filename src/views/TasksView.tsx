@@ -2,8 +2,10 @@ import { DateInput } from '../components/DateInput';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/StoreContext';
 import type { Task } from '../types';
-import { BriefChip, BriefModal } from '../components/EmailBrief';
-import { resolveTask, typeOfTask } from '../utils/brief';
+import { BriefChip, BriefModal, type BriefValue } from '../components/EmailBrief';
+import { EmailSendActions } from '../components/EmailSendActions';
+import { findProspect, resolveTask, typeOfTask } from '../utils/brief';
+import { draftFromBrief, emailSubject } from '../utils/emailDraft';
 import { formatDisplay, isOverdue, isDueToday, todayISO } from '../utils/dates';
 
 export function TasksView() {
@@ -74,6 +76,15 @@ export function TasksView() {
                 ) : null}
               </div>
               <BriefChip brief={resolveTask(data, t)} onClick={() => setBriefTask(t)} />
+              {resolveTask(data, t).type === 'email' ? (
+                <EmailSendActions
+                  draft={draftFromBrief(
+                    resolveTask(data, t),
+                    emailSubject(t.relatedCompany || '', t.kind === 'confirmation-email' ? 'confirmation' : 'follow-up'),
+                  )}
+                  label={t.relatedCompany || t.title}
+                />
+              ) : null}
               <span className="due">
                 {formatDisplay(t.dueDate)}
                 {isOverdue(t.dueDate) ? ' · overdue' : ''}
@@ -122,6 +133,19 @@ export function TasksView() {
             briefWhat: briefTask.briefWhat,
             briefHow: briefTask.briefHow,
           }}
+          inherited={(() => {
+            const linked = findProspect(data, briefTask.relatedProspectId, briefTask.relatedCompany);
+            if (!linked) return undefined;
+            const inherited: BriefValue = {
+              contactName: linked.contact,
+              contactEmail: linked.contactEmail,
+              contactPhone: linked.contactPhone,
+              briefWhat: linked.briefWhat,
+              briefHow: linked.briefHow,
+            };
+            return inherited;
+          })()}
+          subject={emailSubject(briefTask.relatedCompany || '', briefTask.kind === 'confirmation-email' ? 'confirmation' : 'follow-up')}
           inheritHint="Blank fields fall back to the linked prospect’s contact and brief."
           defaultStyle={data.settings?.defaultEmailStyle}
           onSave={(v) => updateBrief('task', briefTask.id, v)}

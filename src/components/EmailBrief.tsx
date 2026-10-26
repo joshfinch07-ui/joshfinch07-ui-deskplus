@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { FollowUpType } from '../types';
 import type { ResolvedBrief } from '../utils/brief';
 import { briefLabels, briefState, TYPE_ICON } from '../utils/brief';
+import { makeDraft } from '../utils/emailDraft';
+import { EmailSendActions } from './EmailSendActions';
 import { Modal } from './Modal';
 
 export interface BriefValue {
@@ -53,6 +55,10 @@ export function EmailBriefFields({
   hideContact = false,
   inheritedType,
   inherited,
+  /** Name used in the greeting when it lives outside the brief fields. */
+  contactName,
+  /** Prefilled Outlook / Salesloft subject. Email actions are hidden for calls. */
+  subject,
 }: {
   value: BriefValue;
   onChange: (patch: BriefValue) => void;
@@ -65,6 +71,8 @@ export function EmailBriefFields({
   compact?: boolean;
   hideContact?: boolean;
   inheritedType?: FollowUpType;
+  contactName?: string;
+  subject?: string;
 }) {
   const type: FollowUpType = value.followUpType ?? inheritedType ?? 'email';
   const L = briefLabels(type);
@@ -141,6 +149,28 @@ export function EmailBriefFields({
             rows={compact ? 1 : 2}
           />
         </div>
+        {type === 'email' ? (
+          <EmailSendActions
+            layout="inline"
+            label={subject?.trim() || 'this follow-up'}
+            draft={makeDraft({
+              to: (value.contactEmail ?? '').trim() || (inherited?.contactEmail ?? '').trim(),
+              contactName:
+                (contactName ?? '').trim() ||
+                (value.contactName ?? '').trim() ||
+                (inherited?.contactName ?? '').trim(),
+              whatToSay: (value.briefWhat ?? '').trim() || (inherited?.briefWhat ?? '').trim(),
+              subject: subject?.trim() || 'Following up',
+              toneNote:
+                (value.briefHow ?? '').trim() ||
+                (inherited?.briefHow ?? '').trim() ||
+                (defaultStyle ?? '').trim(),
+              toneIsDefault:
+                !((value.briefHow ?? '').trim() || (inherited?.briefHow ?? '').trim()) &&
+                !!(defaultStyle ?? '').trim(),
+            })}
+          />
+        ) : null}
         {inheritHint ? <p className="field-hint">{inheritHint}</p> : null}
       </div>
     </div>
@@ -192,6 +222,9 @@ export function BriefModal({
   showName = true,
   inheritHint,
   inheritedType,
+  inherited,
+  subject,
+  contactName,
   onSave,
   onClose,
 }: {
@@ -201,6 +234,9 @@ export function BriefModal({
   showName?: boolean;
   inheritHint?: string;
   inheritedType?: FollowUpType;
+  inherited?: BriefValue;
+  subject?: string;
+  contactName?: string;
   onSave: (v: BriefValue) => void;
   onClose: () => void;
 }) {
@@ -234,7 +270,10 @@ export function BriefModal({
         showName={showName}
         showType
         inheritedType={inheritedType}
+        inherited={inherited}
         inheritHint={inheritHint}
+        subject={subject}
+        contactName={contactName}
       />
     </Modal>
   );

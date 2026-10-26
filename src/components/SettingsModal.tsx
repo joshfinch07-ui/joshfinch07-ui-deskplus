@@ -5,6 +5,7 @@ import { listBackups } from '../store/migrate';
 import type { Cadence } from '../types';
 import { cleanCadence, FALLBACK_CADENCE, parseSteps } from '../utils/brief';
 import { fmtTime, useSync } from '../sync/SyncContext';
+import { readMailClient, writeMailClient, type MailClient } from '../utils/mailClient';
 
 export function SettingsModal({ onClose, onToast }: { onClose: () => void; onToast: (m: string) => void }) {
   const { data, updateSettings, replaceData } = useStore();
@@ -17,6 +18,11 @@ export function SettingsModal({ onClose, onToast }: { onClose: () => void; onToa
   const [showToken, setShowToken] = useState(false);
   const [testMsg, setTestMsg] = useState('');
   const [backups, setBackups] = useState(() => listBackups());
+  const [mailClient, setMailClient] = useState<MailClient>(() => readMailClient());
+  const chooseMail = (client: MailClient) => {
+    setMailClient(client);
+    writeMailClient(client);
+  };
 
   const saveStyle = () => {
     const g = Math.min(60, Math.max(1, Math.round(Number(gap)) || 3));
@@ -60,7 +66,36 @@ export function SettingsModal({ onClose, onToast }: { onClose: () => void; onToa
             rows={3}
             placeholder="e.g. Short (under 120 words), warm and direct, first name, Australian spelling, no jargon, sign off “Cheers, Josh”."
           />
-          <p className="field-hint">Used for any follow-up whose “How to write it” is blank.</p>
+          <p className="field-hint">
+            Tone only, for any follow-up whose “How to write it” is blank. It is not pasted into the email.
+          </p>
+        </div>
+        <div className="field">
+          <label>Open in Outlook</label>
+          <div className="mail-client" role="radiogroup" aria-label="Mail client">
+            <label>
+              <input
+                type="radio"
+                name="mail-client"
+                checked={mailClient === 'outlook-web'}
+                onChange={() => chooseMail('outlook-web')}
+              />
+              Outlook on the web
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="mail-client"
+                checked={mailClient === 'mailto'}
+                onChange={() => chooseMail('mailto')}
+              />
+              Desktop Outlook (mailto)
+            </label>
+          </div>
+          <p className="field-hint">
+            Drafts use “What to say”, a Hi first-name greeting, and “Cheers, Josh”. “How to write it” and the default
+            style stay as tone only.
+          </p>
         </div>
         <div className="field" style={{ maxWidth: 320 }}>
           <label>Default follow-up gap (business days)</label>
