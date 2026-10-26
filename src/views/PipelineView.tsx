@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { Prospect, SortBy, Temperature } from '../types';
 import { useStore } from '../store/StoreContext';
 import { formatDisplay, isOverdue, isDueToday } from '../utils/dates';
+import { TYPE_ICON, briefState, resolveProspect } from '../utils/brief';
+import { HubLinks } from '../components/HubLinks';
 
 const COLS: Temperature[] = ['Cold', 'Warm', 'Hot'];
 
@@ -9,9 +11,11 @@ export function PipelineView({ onOpenProspect }: { onOpenProspect: (id: string) 
   const { data } = useStore();
   const [minPriority, setMinPriority] = useState(0);
   const [sortBy, setSortBy] = useState<SortBy>('nextFollowUp');
+  const [docsOnly, setDocsOnly] = useState(false);
+  const docsCount = data.prospects.filter((p) => p.documentsSent?.date).length;
 
   const filtered = useMemo(() => {
-    let list = data.prospects.filter((p) => p.priority >= minPriority);
+    let list = data.prospects.filter((p) => p.priority >= minPriority && (!docsOnly || !!p.documentsSent?.date));
     list = [...list].sort((a, b) => {
       if (sortBy === 'priority') return b.priority - a.priority;
       if (sortBy === 'name') return a.company.localeCompare(b.company);
@@ -22,7 +26,7 @@ export function PipelineView({ onOpenProspect }: { onOpenProspect: (id: string) 
       return a.nextFollowUp.localeCompare(b.nextFollowUp);
     });
     return list;
-  }, [data.prospects, minPriority, sortBy]);
+  }, [data.prospects, minPriority, sortBy, docsOnly]);
 
   const byTemp = (t: Temperature) => filtered.filter((p) => p.temperature === t);
 
@@ -62,6 +66,16 @@ export function PipelineView({ onOpenProspect }: { onOpenProspect: (id: string) 
             <option value="name">Name</option>
           </select>
         </div>
+        <div className="filter-group">
+          <label>Stage</label>
+          <button
+            type="button"
+            className={`btn btn-sm ${docsOnly ? 'btn-primary' : 'btn-ghost'} docs-filter`}
+            onClick={() => setDocsOnly((v) => !v)}
+          >
+            📄 Documents sent ({docsCount})
+          </button>
+        </div>
       </div>
       <div className="kanban">
         {COLS.map((col) => {
@@ -95,19 +109,30 @@ function ProspectCard({
   prospect: Prospect;
   onOpen: (id: string) => void;
 }) {
+  const { data } = useStore();
   const dueClass = isOverdue(p.nextFollowUp)
     ? 'overdue'
     : isDueToday(p.nextFollowUp)
       ? 'due-today'
       : '';
   return (
-    <div className="prospect-card" onClick={() => onOpen(p.id)} role="button" tabIndex={0}
+    <div className={`prospect-card${p.documentsSent?.date ? ' docs-sent' : ''}`} onClick={() => onOpen(p.id)} role="button" tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onOpen(p.id)}>
       <div className="company">
         {p.company}
         {p.isExample ? <span className="example-badge">EXAMPLE</span> : null}
       </div>
       <div className="meta">{p.contact || 'No contact'}</div>
+      {p.documentsSent?.date ? (
+        <div
+          className="docs-badge"
+          title={(p.documentsSent.docs ?? []).join('\n') || 'Documents sent'}
+        >
+          📄 Docs sent {formatDisplay(p.documentsSent.date)}
+          {p.documentsSent.docs?.length ? ` · ${p.documentsSent.docs.length} doc${p.documentsSent.docs.length > 1 ? 's' : ''}` : ''}
+          {p.documentsSent.sentBy ? ` · ${p.documentsSent.sentBy}` : ''}
+        </div>
+      ) : null}
       {p.nextSteps ? (
         <div className="meta" style={{ marginTop: 4 }}>
           {p.nextSteps}
@@ -123,7 +148,23 @@ function ProspectCard({
           </span>
         ) : null}
         {p.currencyPairs ? <span className="chip">{p.currencyPairs}</span> : null}
+        {(() => {
+          const r = resolveProspect(data, p);
+          const st = briefState(r);
+          if (st === 'no-brief') return null;
+          const call = r.type === 'call';
+          return (
+            <span
+              className={`chip ${st === 'ready' ? 'brief-chip-ok' : 'brief-chip-warn'}`}
+              title={st === 'ready' ? `${call ? 'Call' : 'Email'} brief ready → ${call ? r.contactPhone : r.contactEmail}` : `Brief written — no contact ${call ? 'phone' : 'email'}`}
+            >
+              {TYPE_ICON[r.type]}
+              {st === 'ready' ? '' : call ? ' no phone' : ' no email'}
+            </span>
+          );
+        })()}
       </div>
+      <HubLinks prospect={p} />
     </div>
   );
 }

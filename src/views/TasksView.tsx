@@ -1,11 +1,14 @@
+import { DateInput } from '../components/DateInput';
 import { useMemo, useState } from 'react';
-import { EmailActions } from '../components/EmailActions';
 import { useStore } from '../store/StoreContext';
+import type { Task } from '../types';
+import { BriefChip, BriefModal } from '../components/EmailBrief';
+import { resolveTask, typeOfTask } from '../utils/brief';
 import { formatDisplay, isOverdue, isDueToday, todayISO } from '../utils/dates';
-import { draftForTask, isEmailFollowUp } from '../utils/emailDraft';
 
 export function TasksView() {
-  const { data, addTask, toggleTask, deleteTask } = useStore();
+  const { data, addTask, toggleTask, deleteTask, updateBrief } = useStore();
+  const [briefTask, setBriefTask] = useState<Task | null>(null);
   const [title, setTitle] = useState('');
   const [due, setDue] = useState(todayISO());
 
@@ -42,13 +45,7 @@ export function TasksView() {
             placeholder="e.g. Document follow up with Acme"
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-          <input
-            className="input"
-            type="date"
-            style={{ width: 160 }}
-            value={due}
-            onChange={(e) => setDue(e.target.value)}
-          />
+          <DateInput value={due} onChange={setDue} aria-label="Due date" />
           <button type="button" className="btn btn-primary" onClick={submit}>
             Add
           </button>
@@ -76,13 +73,11 @@ export function TasksView() {
                   </span>
                 ) : null}
               </div>
+              <BriefChip brief={resolveTask(data, t)} onClick={() => setBriefTask(t)} />
               <span className="due">
                 {formatDisplay(t.dueDate)}
                 {isOverdue(t.dueDate) ? ' · overdue' : ''}
               </span>
-              {isEmailFollowUp(t.kind) ? (
-                <EmailActions draft={draftForTask(t, data.prospects)} label={t.title} />
-              ) : null}
               <button type="button" className="icon-btn" onClick={() => deleteTask(t.id)}>
                 ×
               </button>
@@ -114,6 +109,24 @@ export function TasksView() {
             </div>
           ))}
         </div>
+      ) : null}
+      {briefTask ? (
+        <BriefModal
+          title={`Email brief — ${briefTask.title}`}
+          inheritedType={typeOfTask(briefTask)}
+          initial={{
+            followUpType: briefTask.followUpType,
+            contactPhone: briefTask.contactPhone,
+            contactName: briefTask.contactName,
+            contactEmail: briefTask.contactEmail,
+            briefWhat: briefTask.briefWhat,
+            briefHow: briefTask.briefHow,
+          }}
+          inheritHint="Blank fields fall back to the linked prospect’s contact and brief."
+          defaultStyle={data.settings?.defaultEmailStyle}
+          onSave={(v) => updateBrief('task', briefTask.id, v)}
+          onClose={() => setBriefTask(null)}
+        />
       ) : null}
     </div>
   );
