@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { Temperature } from '../types';
 import { Modal } from './Modal';
 import { useStore } from '../store/StoreContext';
+import { EmailActions } from './EmailActions';
+import { draftForColdCall } from '../utils/emailDraft';
 
 export function ColdCallModal({ onClose }: { onClose: () => void }) {
   const { data, bulkAddColdCalls, updateColdCall, clearColdCalls, promoteColdCall } = useStore();
@@ -86,7 +88,9 @@ export function ColdCallModal({ onClose }: { onClose: () => void }) {
                   >
                     Needs email
                   </button>
-                ) : null}
+                ) : (
+                  <EmailActions draft={draftForColdCall(c)} label={c.company} />
+                )}
                 <PromoteButtons
                   onPromote={(temp) => {
                     promoteColdCall(c.id, temp);

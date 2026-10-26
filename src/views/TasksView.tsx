@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import { EmailActions } from '../components/EmailActions';
 import { useStore } from '../store/StoreContext';
 import { formatDisplay, isOverdue, isDueToday, todayISO } from '../utils/dates';
+import { draftForTask, isEmailFollowUp } from '../utils/emailDraft';
 
 export function TasksView() {
   const { data, addTask, toggleTask, deleteTask } = useStore();
@@ -78,6 +80,9 @@ export function TasksView() {
                 {formatDisplay(t.dueDate)}
                 {isOverdue(t.dueDate) ? ' · overdue' : ''}
               </span>
+              {isEmailFollowUp(t.kind) ? (
+                <EmailActions draft={draftForTask(t, data.prospects)} label={t.title} />
+              ) : null}
               <button type="button" className="icon-btn" onClick={() => deleteTask(t.id)}>
                 ×
               </button>

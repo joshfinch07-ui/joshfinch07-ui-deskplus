@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Temperature } from '../types';
+import { EmailActions } from '../components/EmailActions';
 import { useStore } from '../store/StoreContext';
+import { draftForColdCall } from '../utils/emailDraft';
 
 export function ColdCallsView() {
   const { data, bulkAddColdCalls, updateColdCall, clearColdCalls, promoteColdCall } = useStore();
@@ -89,6 +91,9 @@ export function ColdCallsView() {
                   >
                     Needs email
                   </button>
+                  {c.status === 'needs-email' ? (
+                    <EmailActions draft={draftForColdCall(c)} label={c.company} />
+                  ) : null}
                   {(['Cold', 'Warm'] as Temperature[]).map((temp) => (
                     <button
                       key={temp}

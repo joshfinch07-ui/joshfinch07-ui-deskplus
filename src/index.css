@@ -603,6 +603,107 @@ a {
   color: var(--text);
 }
 
+.email-anchor {
+  position: relative;
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+}
+
+.email-anchor.open {
+  z-index: 30;
+}
+
+.email-chip {
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.email-chip.warn {
+  color: #fcd34d;
+}
+
+.email-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 31;
+  width: max-content;
+  max-width: min(280px, 70vw);
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 8px;
+}
+
+.email-pop-actions,
+.email-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.email-pop-actions {
+  flex-direction: column;
+  margin-top: 6px;
+}
+
+.email-pop-actions .btn {
+  justify-content: flex-start;
+}
+
+.email-inline {
+  margin-top: 8px;
+  align-items: center;
+}
+
+.warn-line,
+.tone-line {
+  flex: 1 0 100%;
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.warn-line {
+  color: #fcd34d;
+}
+
+.tone-line {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.mail-settings {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.mail-settings legend {
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.mail-settings label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 0.9rem;
+}
+
+.mail-settings-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;

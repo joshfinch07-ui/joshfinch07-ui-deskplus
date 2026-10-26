@@ -11,7 +11,9 @@ import { TasksView } from './views/TasksView';
 import { ProspectForm } from './components/ProspectForm';
 import { ColdCallModal } from './components/ColdCallModal';
 import { BookMeetingForm, LogActivityForm, LogMeetingForm } from './components/MeetingForms';
+import { MailSettings } from './components/MailSettings';
 import { Toast } from './components/Toast';
+import { MailClientProvider } from './mail/MailClientContext';
 
 const TABS: { id: ViewId; label: string }[] = [
   { id: 'today', label: 'Today' },
@@ -117,6 +119,10 @@ function AppInner() {
       {view === 'tasks' ? <TasksView /> : null}
 
       <div className="card" style={{ marginTop: 20 }}>
+        <MailSettings />
+      </div>
+
+      <div className="card">
         <div className="section-title">
           <h2 style={{ fontSize: '1rem' }}>Data</h2>
         </div>
@@ -199,7 +205,9 @@ function AppInner() {
 export default function App() {
   return (
     <StoreProvider>
-      <AppInner />
+      <MailClientProvider>
+        <AppInner />
+      </MailClientProvider>
     </StoreProvider>
   );
 }

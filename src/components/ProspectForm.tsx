@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { Priority, Prospect, ProspectType, Temperature } from '../types';
 import { Modal } from './Modal';
 import { SegControl } from './SegControl';
+import { EmailActions } from './EmailActions';
 import { useStore } from '../store/StoreContext';
+import { draftForProspectFields, optionalField } from '../utils/emailDraft';
 
 const TEMPS: Temperature[] = ['Cold', 'Warm', 'Hot'];
 const PRIOS: Priority[] = [1, 2, 3, 4, 5];
@@ -112,7 +114,21 @@ export function ProspectForm({
         <textarea
           value={nextSteps}
           onChange={(e) => setNextSteps(e.target.value)}
-          placeholder="What needs to happen next with this prospect."
+          placeholder="What to say on the next email."
+        />
+        <EmailActions
+          layout="inline"
+          label={company.trim() || 'this prospect'}
+          draft={draftForProspectFields({
+            company,
+            contact,
+            whatToSay:
+              initial && nextSteps === initial.nextSteps && optionalField(initial, 'briefWhat')
+                ? optionalField(initial, 'briefWhat')
+                : nextSteps,
+            contactEmail: optionalField(initial, 'contactEmail'),
+            toneNote: optionalField(initial, 'briefHow'),
+          })}
         />
       </div>
       <div className="field">

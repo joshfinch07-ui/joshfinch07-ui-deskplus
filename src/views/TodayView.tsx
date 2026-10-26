@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
+import { EmailActions } from '../components/EmailActions';
 import { useStore } from '../store/StoreContext';
 import { formatDisplay, isDueToday, isOverdue, isDueOrOverdue } from '../utils/dates';
+import { draftForProspect, draftForTask, isEmailFollowUp, optionalField } from '../utils/emailDraft';
 
 export function TodayView({
   onOpenProspect,
@@ -140,29 +142,39 @@ export function TodayView({
                   {formatDisplay(t.dueDate)}
                   {isOverdue(t.dueDate) ? ' · overdue' : ' · today'}
                 </span>
+                {isEmailFollowUp(t.kind) ? (
+                  <EmailActions draft={draftForTask(t, data.prospects)} label={t.title} />
+                ) : null}
               </div>
             ))}
             {followUpsDue.fromProspects.map((p) => (
               <div
                 key={p.id}
                 className={`list-item${isOverdue(p.nextFollowUp) ? ' overdue' : ' due-today'}`}
-                style={{ cursor: 'pointer' }}
-                onClick={() => onOpenProspect(p.id)}
-                onKeyDown={(e) => e.key === 'Enter' && onOpenProspect(p.id)}
-                role="button"
-                tabIndex={0}
               >
-                <div className="title">
+                <div
+                  className="title"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onOpenProspect(p.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && onOpenProspect(p.id)}
+                  role="button"
+                  tabIndex={0}
+                >
                   Prospect follow-up — {p.company}
                   {p.isExample ? <span className="example-badge">EXAMPLE</span> : null}
                   <div style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    {p.nextSteps || p.contact || 'Open card'}
+                    {optionalField(p, 'briefWhat') || p.nextSteps || p.contact || 'Open card'}
                   </div>
                 </div>
-                <span className="due">
+                <span
+                  className="due"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onOpenProspect(p.id)}
+                >
                   {formatDisplay(p.nextFollowUp)}
                   {isOverdue(p.nextFollowUp) ? ' · overdue' : ' · today'}
                 </span>
+                <EmailActions draft={draftForProspect(p)} label={p.company} />
               </div>
             ))}
             {tradeChases.map((t) => (
