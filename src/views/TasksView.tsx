@@ -1,9 +1,16 @@
+import { DateInput } from '../components/DateInput';
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/StoreContext';
+import type { Task } from '../types';
+import { BriefChip, BriefModal, type BriefValue } from '../components/EmailBrief';
+import { EmailSendActions } from '../components/EmailSendActions';
+import { findProspect, resolveTask, typeOfTask } from '../utils/brief';
+import { draftFromBrief, emailSubject } from '../utils/emailDraft';
 import { formatDisplay, isOverdue, isDueToday, todayISO } from '../utils/dates';
 
 export function TasksView() {
-  const { data, addTask, toggleTask, deleteTask } = useStore();
+  const { data, addTask, toggleTask, deleteTask, updateBrief } = useStore();
+  const [briefTask, setBriefTask] = useState<Task | null>(null);
   const [title, setTitle] = useState('');
   const [due, setDue] = useState(todayISO());
 
@@ -40,13 +47,7 @@ export function TasksView() {
             placeholder="e.g. Document follow up with Acme"
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-          <input
-            className="input"
-            type="date"
-            style={{ width: 160 }}
-            value={due}
-            onChange={(e) => setDue(e.target.value)}
-          />
+          <DateInput value={due} onChange={setDue} aria-label="Due date" />
           <button type="button" className="btn btn-primary" onClick={submit}>
             Add
           </button>
@@ -74,6 +75,16 @@ export function TasksView() {
                   </span>
                 ) : null}
               </div>
+              <BriefChip brief={resolveTask(data, t)} onClick={() => setBriefTask(t)} />
+              {resolveTask(data, t).type === 'email' ? (
+                <EmailSendActions
+                  draft={draftFromBrief(
+                    resolveTask(data, t),
+                    emailSubject(t.relatedCompany || '', t.kind === 'confirmation-email' ? 'confirmation' : 'follow-up'),
+                  )}
+                  label={t.relatedCompany || t.title}
+                />
+              ) : null}
               <span className="due">
                 {formatDisplay(t.dueDate)}
                 {isOverdue(t.dueDate) ? ' · overdue' : ''}
@@ -109,6 +120,37 @@ export function TasksView() {
             </div>
           ))}
         </div>
+      ) : null}
+      {briefTask ? (
+        <BriefModal
+          title={`Email brief — ${briefTask.title}`}
+          inheritedType={typeOfTask(briefTask)}
+          initial={{
+            followUpType: briefTask.followUpType,
+            contactPhone: briefTask.contactPhone,
+            contactName: briefTask.contactName,
+            contactEmail: briefTask.contactEmail,
+            briefWhat: briefTask.briefWhat,
+            briefHow: briefTask.briefHow,
+          }}
+          inherited={(() => {
+            const linked = findProspect(data, briefTask.relatedProspectId, briefTask.relatedCompany);
+            if (!linked) return undefined;
+            const inherited: BriefValue = {
+              contactName: linked.contact,
+              contactEmail: linked.contactEmail,
+              contactPhone: linked.contactPhone,
+              briefWhat: linked.briefWhat,
+              briefHow: linked.briefHow,
+            };
+            return inherited;
+          })()}
+          subject={emailSubject(briefTask.relatedCompany || '', briefTask.kind === 'confirmation-email' ? 'confirmation' : 'follow-up')}
+          inheritHint="Blank fields fall back to the linked prospect’s contact and brief."
+          defaultStyle={data.settings?.defaultEmailStyle}
+          onSave={(v) => updateBrief('task', briefTask.id, v)}
+          onClose={() => setBriefTask(null)}
+        />
       ) : null}
     </div>
   );

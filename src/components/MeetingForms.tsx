@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import type { Meeting, Priority, ProspectType, Temperature } from '../types';
+import type { BookedBy, Meeting, Priority, ProspectType, Temperature } from '../types';
 import { Modal } from './Modal';
 import { SegControl } from './SegControl';
 import { useStore } from '../store/StoreContext';
 import { todayISO } from '../utils/dates';
+import { DateInput } from './DateInput';
 
 const TEMPS: Temperature[] = ['Cold', 'Warm', 'Hot'];
 const PRIOS: Priority[] = [1, 2, 3, 4, 5];
@@ -24,6 +25,9 @@ export function BookMeetingForm({
   const [timezone, setTimezone] = useState('Australia/Sydney');
   const [notes, setNotes] = useState('');
   const [currencies, setCurrencies] = useState('');
+  const [fxVolume, setFxVolume] = useState('');
+  const [bookedBy, setBookedBy] = useState<BookedBy>('Me');
+  const [bookedByName, setBookedByName] = useState('');
 
   const save = () => {
     if (!company.trim() || !meetingDate) return;
@@ -35,6 +39,9 @@ export function BookMeetingForm({
       timezone,
       notes,
       currencies,
+      fxVolume,
+      bookedBy,
+      bookedByName: bookedBy === 'Me' ? '' : bookedByName.trim(),
     });
     onClose();
   };
@@ -56,7 +63,9 @@ export function BookMeetingForm({
     >
       <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 0 }}>
         Booking auto-creates a confirmation call task (2 days before) and confirmation email task (1 day before).
+        It stays in Upcoming meetings and only joins the Pipeline once you log it as attended.
       </p>
+      <BookedByFields bookedBy={bookedBy} setBookedBy={setBookedBy} name={bookedByName} setName={setBookedByName} />
       <div className="field">
         <label>Company</label>
         <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Acme Imports" autoFocus />
@@ -67,7 +76,7 @@ export function BookMeetingForm({
       </div>
       <div className="field">
         <label>Meeting date</label>
-        <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+        <DateInput value={meetingDate} onChange={setMeetingDate} aria-label="Meeting date" />
       </div>
       <div className="field">
         <label>Time (optional)</label>
@@ -87,6 +96,10 @@ export function BookMeetingForm({
       <div className="field">
         <label>Currency pairs (optional)</label>
         <input value={currencies} onChange={(e) => setCurrencies(e.target.value)} placeholder="AUDUSD" />
+      </div>
+      <div className="field">
+        <label>FX volume (optional)</label>
+        <input value={fxVolume} onChange={(e) => setFxVolume(e.target.value)} placeholder="e.g. ~AUD 5m / yr" />
       </div>
       <div className="field">
         <label>Notes</label>
@@ -111,8 +124,8 @@ export function LogMeetingForm({
   const [sufficient, setSufficient] = useState<boolean | null>(null);
   const [rating, setRating] = useState<Priority | null>(3);
   const [currencies, setCurrencies] = useState(meeting?.currencies ?? '');
-  const [fxVolume, setFxVolume] = useState('');
-  const [notes, setNotes] = useState('');
+  const [fxVolume, setFxVolume] = useState(meeting?.fxVolume ?? '');
+  const [notes, setNotes] = useState(meeting?.notes ?? '');
   const [nextFollowUp, setNextFollowUp] = useState('');
   const [temperature, setTemperature] = useState<Temperature>('Warm');
   const [priority, setPriority] = useState<Priority>(3);
@@ -168,7 +181,7 @@ export function LogMeetingForm({
       </div>
       <div className="field">
         <label>Meeting date</label>
-        <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+        <DateInput value={meetingDate} onChange={setMeetingDate} aria-label="Meeting date" />
       </div>
       <div className="field">
         <label>Outcome</label>
@@ -243,7 +256,7 @@ export function LogMeetingForm({
       </div>
       <div className="field">
         <label>Next follow-up date</label>
-        <input type="date" value={nextFollowUp} onChange={(e) => setNextFollowUp(e.target.value)} />
+        <DateInput value={nextFollowUp} onChange={setNextFollowUp} aria-label="Next follow-up date" />
       </div>
     </Modal>
   );
@@ -302,6 +315,72 @@ export function LogActivityForm({
         <label>Notes</label>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+    </Modal>
+  );
+}
+
+export function bookedByLabel(m: Pick<Meeting, 'bookedBy' | 'bookedByName'>): string {
+  const b = m.bookedBy ?? 'Me';
+  if (b === 'Me') return 'Me';
+  if (b === 'Daniel') return m.bookedByName || 'Daniel';
+  return m.bookedByName || 'Other associate';
+}
+
+export function BookedByFields({
+  bookedBy,
+  setBookedBy,
+  name,
+  setName,
+}: {
+  bookedBy: BookedBy;
+  setBookedBy: (b: BookedBy) => void;
+  name: string;
+  setName: (n: string) => void;
+}) {
+  return (
+    <>
+      <div className="field">
+        <label>Booked by</label>
+        <SegControl
+          options={[
+            { value: 'Me' as const, label: 'Me' },
+            { value: 'Daniel' as const, label: 'Daniel' },
+            { value: 'Other' as const, label: 'Other associate' },
+          ]}
+          value={bookedBy}
+          onChange={setBookedBy}
+        />
+      </div>
+      {bookedBy === 'Other' ? (
+        <div className="field">
+          <label>Associate name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sarah Lee" />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+export function EditBookedByForm({ meeting, onClose }: { meeting: Meeting; onClose: () => void }) {
+  const { updateMeeting } = useStore();
+  const [bookedBy, setBookedBy] = useState<BookedBy>(meeting.bookedBy ?? 'Me');
+  const [name, setName] = useState(meeting.bookedByName ?? '');
+  const save = () => {
+    updateMeeting(meeting.id, { bookedBy, bookedByName: bookedBy === 'Me' ? '' : name.trim() });
+    onClose();
+  };
+  return (
+    <Modal
+      title={`Booked by — ${meeting.company}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" onClick={save}>Save</button>
+        </>
+      }
+    >
+      <BookedByFields bookedBy={bookedBy} setBookedBy={setBookedBy} name={name} setName={setName} />
     </Modal>
   );
 }
