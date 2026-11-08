@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { BookedBy, ColdLead, Meeting, Priority, Prospect, ProspectType, Temperature } from '../types';
 import type { BookPrefill } from '../nav';
 import { normCompany, searchProspects } from '../utils/company';
+import { is2027Account } from '../utils/accountSection';
 import { Modal } from './Modal';
 import { SegControl } from './SegControl';
 import { useStore } from '../store/StoreContext';
@@ -64,7 +65,7 @@ function BookCompanyField({
             {prospectMatches.map((p) => (
               <li key={p.id}>
                 <button type="button" role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => { onPick({ kind: 'prospect', item: p }); setOpen(false); }}>
-                  {p.company} <small>Pipeline · {p.temperature}{p.contact ? ` · ${p.contact}` : ''}</small>
+                  {p.company} <small>{is2027Account(p) ? '2027 Accounts' : 'Pipeline'} · {p.temperature}{p.contact ? ` · ${p.contact}` : ''}</small>
                 </button>
               </li>
             ))}
@@ -80,7 +81,7 @@ function BookCompanyField({
       </div>
       {linkedP || linkedC ? (
         <p className="field-hint book-link" data-testid="book-link">
-          🔗 Linked to {linkedP ? `pipeline prospect “${linkedP.company}”` : `cold lead “${linkedC!.company}”`} — the meeting will show on their card.{' '}
+          🔗 Linked to {linkedP ? `${is2027Account(linkedP) ? '2027 account' : 'pipeline prospect'} “${linkedP.company}”` : `cold lead “${linkedC!.company}”`} — the meeting will show on their card.{' '}
           <button type="button" className="link-btn" onClick={onUnlink}>unlink</button>
         </p>
       ) : (

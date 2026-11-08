@@ -231,6 +231,20 @@ a {
   font-size: 0.85rem;
 }
 
+.section-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.section-lead {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: -4px 0 12px;
+  max-width: 70ch;
+}
+
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -482,6 +496,17 @@ a {
 .chip.type {
   color: #c4b5fd;
   border-color: rgba(139, 92, 246, 0.35);
+}
+
+.chip.year-2027 {
+  color: #fcd34d;
+  border-color: rgba(252, 211, 77, 0.45);
+}
+
+.card-move {
+  margin-top: 8px;
+  width: 100%;
+  justify-content: center;
 }
 
 .chip.overdue {

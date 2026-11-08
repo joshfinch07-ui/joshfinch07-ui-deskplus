@@ -152,16 +152,28 @@ export async function fetchRemote(cfg: SyncConfig): Promise<RemoteFile> {
   } catch {
     throw new SyncError('Cloud file is not valid JSON — not touching it. Fix or delete it in GitHub.');
   }
+  const payload = readDeskPlusPayload(parsed);
+  if (!payload) throw new SyncError('Cloud file is not a Desk+ file — not touching it.');
   const obj = parsed as Partial<Envelope> & Partial<AppData>;
   if (obj.app === 'deskplus' && obj.data) return { sha: j.sha, envelope: obj as Envelope };
   // Bare export JSON (e.g. uploaded by hand) is accepted too.
-  if (obj.version === 1 && Array.isArray(obj.prospects)) {
-    return {
-      sha: j.sha,
-      envelope: { app: 'deskplus', format: 1, pushedAt: '', device: 'manual upload', data: obj as AppData },
-    };
-  }
-  throw new SyncError('Cloud file is not a Desk+ file — not touching it.');
+  return {
+    sha: j.sha,
+    envelope: { app: 'deskplus', format: 1, pushedAt: '', device: 'manual upload', data: payload },
+  };
+}
+
+/**
+ * Desk+ JSON from the cloud: the sync envelope, or a bare export uploaded by hand.
+ * Returns null when the file is something else — callers must not overwrite it.
+ * Prospect fields such as `accountSection` are left intact for normalizeData.
+ */
+export function readDeskPlusPayload(parsed: unknown): AppData | null {
+  if (!parsed || typeof parsed !== 'object') return null;
+  const obj = parsed as Partial<Envelope> & Partial<AppData>;
+  if (obj.app === 'deskplus' && obj.data && typeof obj.data === 'object') return obj.data as AppData;
+  if (obj.version === 1 && Array.isArray(obj.prospects)) return obj as AppData;
+  return null;
 }
 
 export async function putRemote(cfg: SyncConfig, data: AppData, sha: string | null): Promise<string> {

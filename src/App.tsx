@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Prospect, ViewId } from './types';
+import type { AccountSection, Prospect, ViewId } from './types';
 import { StoreProvider, useStore } from './store/StoreContext';
 import { headerDate } from './utils/dates';
 import { TodayView } from './views/TodayView';
-import { PipelineView } from './views/PipelineView';
+import { Accounts2027View, PipelineView } from './views/PipelineView';
 import { ColdCallsView } from './views/ColdCallsView';
 import { ColdLeadsView } from './views/ColdLeadsView';
 import { MeetingsView } from './views/MeetingsView';
@@ -21,6 +21,7 @@ import { SyncProvider, fmtTime, useSync } from './sync/SyncContext';
 const TABS: { id: ViewId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'pipeline', label: 'Pipeline' },
+  { id: 'accounts2027', label: '2027 Accounts' },
   { id: 'coldcalls', label: 'Cold calls' },
   { id: 'coldleads', label: 'Cold leads' },
   { id: 'meetings', label: 'Meetings' },
@@ -55,6 +56,11 @@ function AppInner() {
     [],
   );
   const [prospectForm, setProspectForm] = useState<Prospect | null | 'new'>(null);
+  const [newSection, setNewSection] = useState<AccountSection>('pipeline');
+  const openNewProspect = (section: AccountSection) => {
+    setNewSection(section);
+    setProspectForm('new');
+  };
   const [coldOpen, setColdOpen] = useState(false);
   const [bookOpen, setBookOpen] = useState(false);
   const [bookPrefill, setBookPrefill] = useState<BookPrefill | null>(null);
@@ -108,7 +114,7 @@ function AppInner() {
           <button type="button" className="btn btn-coldcall" onClick={() => setColdOpen(true)}>
             ☎ Cold call list
           </button>
-          <button type="button" className="btn btn-primary" onClick={() => setProspectForm('new')}>
+          <button type="button" className="btn btn-primary" onClick={() => openNewProspect('pipeline')}>
             + Add prospect
           </button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLogKind('call')}>
@@ -149,9 +155,18 @@ function AppInner() {
       </nav>
 
       <NavContext.Provider value={nav}>
-      {view === 'today' || view === 'pipeline' || view === 'coldleads' ? <DuplicatesBanner /> : null}
+      {view === 'today' || view === 'pipeline' || view === 'accounts2027' || view === 'coldleads' ? <DuplicatesBanner /> : null}
       {view === 'today' ? <TodayView onOpenProspect={openProspect} /> : null}
-      {view === 'pipeline' ? <PipelineView onOpenProspect={openProspect} /> : null}
+      {view === 'pipeline' ? (
+        <PipelineView onOpenProspect={openProspect} onMoved={setToast} />
+      ) : null}
+      {view === 'accounts2027' ? (
+        <Accounts2027View
+          onOpenProspect={openProspect}
+          onAdd={() => openNewProspect('2027')}
+          onMoved={setToast}
+        />
+      ) : null}
       {view === 'coldcalls' ? <ColdCallsView /> : null}
       {view === 'coldleads' ? <ColdLeadsView /> : null}
       {view === 'meetings' ? <MeetingsView focus={focus} onClearFocus={() => setFocus(undefined)} /> : null}
@@ -247,7 +262,13 @@ function AppInner() {
       </div>
 
       {prospectForm === 'new' ? (
-        <ProspectForm onOpenOther={openProspect} onClose={() => setProspectForm(null)} onSaved={() => setToast('Prospect saved')} />
+        <ProspectForm
+          key={newSection}
+          defaultSection={newSection}
+          onOpenOther={openProspect}
+          onClose={() => setProspectForm(null)}
+          onSaved={() => setToast(newSection === '2027' ? '2027 account saved' : 'Prospect saved')}
+        />
       ) : null}
       {prospectForm && prospectForm !== 'new' ? (
         <NavContext.Provider value={nav}>
@@ -256,7 +277,7 @@ function AppInner() {
           onOpenOther={openProspect}
           initial={prospectForm}
           onClose={() => setProspectForm(null)}
-          onSaved={() => setToast('Prospect updated')}
+          onSaved={(p) => setToast(p.accountSection === '2027' ? '2027 account updated' : 'Prospect updated')}
         />
         </NavContext.Provider>
       ) : null}

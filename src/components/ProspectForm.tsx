@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Priority, Prospect, ProspectType, Temperature } from '../types';
+import type { AccountSection, Priority, Prospect, ProspectType, Temperature } from '../types';
+import { is2027Account } from '../utils/accountSection';
 import { Modal } from './Modal';
 import { HubLinks } from './HubLinks';
 import { nearProspects, prospectByName } from '../utils/company';
@@ -16,11 +17,14 @@ const TYPES: ProspectType[] = ['Prospect', 'Existing client'];
 
 export function ProspectForm({
   initial,
+  defaultSection = 'pipeline',
   onClose,
   onSaved,
   onOpenOther,
 }: {
   initial?: Prospect | null;
+  /** Classification for a new account. Ignored when editing. */
+  defaultSection?: AccountSection;
   onClose: () => void;
   onSaved?: (p: Prospect) => void;
   /** Switch the form to another (possibly duplicate) prospect. */
@@ -29,6 +33,9 @@ export function ProspectForm({
   const { data, upsertProspect, deleteProspect, logCall, logEmail } = useStore();
   const { book } = useNav();
   const [company, setCompany] = useState(initial?.company ?? '');
+  const [section, setSection] = useState<AccountSection>(
+    initial ? (is2027Account(initial) ? '2027' : 'pipeline') : defaultSection,
+  );
   const [contact, setContact] = useState(initial?.contact ?? '');
   const [temperature, setTemperature] = useState<Temperature>(initial?.temperature ?? 'Cold');
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? 3);
@@ -68,6 +75,7 @@ export function ProspectForm({
       currencyPairs,
       nextFollowUp: nextFollowUp || null,
       type,
+      accountSection: section === '2027' ? '2027' : undefined,
       contactEmail: (brief.contactEmail ?? '').trim(),
       contactPhone: (brief.contactPhone ?? '').trim(),
       followUpType: brief.followUpType ?? 'email',
@@ -90,7 +98,15 @@ export function ProspectForm({
 
   return (
     <Modal
-      title={initial ? 'Edit prospect' : 'Add prospect'}
+      title={
+        initial
+          ? section === '2027'
+            ? 'Edit 2027 account'
+            : 'Edit prospect'
+          : section === '2027'
+            ? 'Add 2027 account'
+            : 'Add prospect'
+      }
       onClose={onClose}
       footer={
         <>
@@ -113,7 +129,7 @@ export function ProspectForm({
             Cancel
           </button>
           <button type="button" className="btn btn-primary" onClick={() => save()}>
-            {initial ? 'Save' : 'Add prospect'}
+            {initial ? 'Save' : section === '2027' ? 'Add 2027 account' : 'Add prospect'}
           </button>
         </>
       }
@@ -126,19 +142,40 @@ export function ProspectForm({
           const same = prospectByName(data, company);
           const near = same && same.id !== initial?.id ? [same] : nearProspects(data, company, initial?.id).slice(0, 3);
           if (!near.length) return null;
+          const bookOf = (p: Prospect) => (is2027Account(p) ? '2027 Accounts' : 'Pipeline');
+          const exactOther = !!(same && same.id !== initial?.id);
           return (
             <p className="dup-warn" role="alert">
-              ⚠ {same && same.id !== initial?.id ? 'Already in the pipeline' : 'Similar in pipeline'}:{' '}
+              ⚠ {exactOther ? `Already in ${bookOf(same!)}` : 'Similar account'}:{' '}
               {near.map((p) => (
                 <button key={p.id} type="button" className="link-btn" onClick={() => onOpenOther?.(p.id)}>
                   {p.company}
+                  <small> {bookOf(p)}</small>
                 </button>
               ))}
-              {same && same.id !== initial?.id ? ' — saving will update that prospect instead of adding a duplicate.' : ' — open it instead of adding a duplicate?'}
+              {exactOther
+                ? ` — saving will update that account${bookOf(same!) === (section === '2027' ? '2027 Accounts' : 'Pipeline') ? '' : ` and move it to ${section === '2027' ? '2027 Accounts' : 'Pipeline'}`} instead of adding a duplicate.`
+                : ' — open it instead of adding a duplicate?'}
             </p>
           );
         })()}
         {initial ? <HubLinks prospect={initial} stop={false} /> : null}
+      </div>
+      <div className="field" data-testid="account-classification">
+        <label id="account-classification-label">Classification</label>
+        <SegControl
+          options={[
+            { value: 'pipeline' as const, label: 'Pipeline' },
+            { value: '2027' as const, label: '2027 Accounts' },
+          ]}
+          value={section}
+          onChange={setSection}
+        />
+        <p className="field-hint">
+          {section === '2027'
+            ? '2027 Accounts — expected to sign and trade in 2027. Hidden from the Pipeline tab. Saving keeps this same account: contacts, notes, follow-ups and meetings stay linked.'
+            : 'Pipeline — current book. Not classified as a 2027 account. Saving keeps this same account.'}
+        </p>
       </div>
       <div className="field">
         <label>Contact name (optional)</label>

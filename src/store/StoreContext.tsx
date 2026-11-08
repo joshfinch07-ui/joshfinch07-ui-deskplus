@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { BookedBy,
+  AccountSection,
   AppData,
   AppSettings,
   EmailBrief,
@@ -28,6 +29,7 @@ import type { BookedBy,
   Simulation,
   SimulationStatus,
 } from '../types';
+import { mergeProspectWrite, moveAccountInData } from '../utils/accountSection';
 import { applyMerge } from './merge';
 import { normCompany, type DupMember } from '../utils/company';
 import { addBusinessDaysISO } from '../utils/dates';
@@ -102,6 +104,8 @@ interface StoreApi {
   upsertProspect: (input: Partial<Prospect> & { company: string }) => Prospect;
   updateProspect: (id: string, patch: Partial<Prospect>) => void;
   deleteProspect: (id: string) => void;
+  /** Move an existing account between Pipeline and 2027 Accounts. Same id and links. */
+  setAccountSection: (id: string, section: AccountSection) => void;
   // Cold calls
   bulkAddColdCalls: (lines: string[]) => void;
   updateColdCall: (id: string, patch: Partial<ColdCall>) => void;
@@ -221,37 +225,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ? prev.prospects.find((p) => p.id === input.id)
           : findProspectByCompany(prev, input.company);
         const now = new Date().toISOString();
+        result = mergeProspectWrite(existing, input, now, existing?.id ?? uid());
         if (existing) {
-          result = {
-            ...existing,
-            ...input,
-            company: input.company.trim(),
-            updatedAt: now,
-          };
           return {
             ...prev,
             prospects: prev.prospects.map((p) => (p.id === existing.id ? result : p)),
           };
         }
-        result = {
-          id: uid(),
-          company: input.company.trim(),
-          contact: input.contact ?? '',
-          temperature: input.temperature ?? 'Cold',
-          priority: input.priority ?? 3,
-          nextSteps: input.nextSteps ?? '',
-          currencyPairs: input.currencyPairs ?? '',
-          nextFollowUp: input.nextFollowUp ?? null,
-          type: input.type ?? 'Prospect',
-          contactEmail: input.contactEmail ?? '',
-          contactPhone: input.contactPhone ?? '',
-          followUpType: input.followUpType ?? 'email',
-          briefWhat: input.briefWhat ?? '',
-          briefHow: input.briefHow ?? '',
-          isExample: input.isExample,
-          createdAt: now,
-          updatedAt: now,
-        };
         return { ...prev, prospects: [...prev.prospects, result] };
       });
       return result;
@@ -267,6 +247,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p,
         ),
       }));
+    },
+    [setAndPersist],
+  );
+
+  const setAccountSection = useCallback(
+    (id: string, section: AccountSection) => {
+      setAndPersist((prev) => moveAccountInData(prev, id, section, new Date().toISOString()));
     },
     [setAndPersist],
   );
@@ -1217,6 +1204,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       upsertProspect,
       updateProspect,
       deleteProspect,
+      setAccountSection,
       bulkAddColdCalls,
       updateColdCall,
       clearColdCalls,
@@ -1267,6 +1255,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       upsertProspect,
       updateProspect,
       deleteProspect,
+      setAccountSection,
       bulkAddColdCalls,
       updateColdCall,
       clearColdCalls,

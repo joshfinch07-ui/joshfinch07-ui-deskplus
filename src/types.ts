@@ -17,6 +17,14 @@ export type ColdCallStatus = 'queued' | 'called' | 'needs-email' | 'promoted';
 export type ColdLeadStatus = 'Open' | 'Parked' | 'Done';
 
 /**
+ * Which book an account sits in.
+ * Absent or anything other than `'2027'` → Pipeline (older JSON has no field).
+ * `'2027'` → 2027 Accounts: expected to sign and trade in 2027.
+ * Never inferred — set only when someone classifies the account.
+ */
+export type AccountSection = 'pipeline' | '2027';
+
+/**
  * Email brief fields (all optional so older saves load unchanged).
  * The morning assistant uses these to draft follow-up emails.
  */
@@ -89,6 +97,11 @@ export interface Prospect extends EmailBrief {
   currencyPairs: string;
   nextFollowUp: string | null; // YYYY-MM-DD
   type: ProspectType;
+  /**
+   * Classification. Only `'2027'` is listed under 2027 Accounts and hidden from Pipeline.
+   * Absent on older saves — those accounts stay in Pipeline.
+   */
+  accountSection?: AccountSection;
   lastActivity?: LastActivity;
   /** Onboarding documents emailed by Corpay sales support (e.g. Queeny). Absent → none. */
   documentsSent?: DocumentsSent | null;
@@ -278,6 +291,7 @@ export type SortBy = 'nextFollowUp' | 'priority' | 'name';
 export type ViewId =
   | 'today'
   | 'pipeline'
+  | 'accounts2027'
   | 'coldcalls'
   | 'coldleads'
   | 'meetings'

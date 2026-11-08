@@ -23,6 +23,7 @@ import {
   type ResolvedBrief,
 } from '../utils/brief';
 import { formatDisplay, isDueToday, isOverdue, isDueOrOverdue } from '../utils/dates';
+import { is2027Account } from '../utils/accountSection';
 
 type FollowUpItem =
   | { kind: 'task'; item: Task; due: string | null }
@@ -42,6 +43,11 @@ const PART_LABEL: Record<string, string> = {
   proposal: 'proposal follow-up',
   simulation: 'sim follow-up',
 };
+
+function followUpKindLabel(f: FollowUpItem): string {
+  if (f.kind === 'prospect' && is2027Account(f.item)) return '2027 account follow-up';
+  return PART_LABEL[f.kind] ?? f.kind;
+}
 
 function ReminderSection({
   title,
@@ -444,7 +450,10 @@ export function TodayView({
       const x = f.item;
       return `📈 Sim ${x.month} · ${[x.pair, x.volume].filter(Boolean).join(' ')}${x.structure ? ` · ${x.structure}` : ''} · ${x.status}`;
     }
-    if (f.kind === 'prospect') return `🗂 Pipeline · ${f.item.nextSteps || f.item.temperature}`;
+    if (f.kind === 'prospect') {
+      const where = is2027Account(f.item) ? '2027 Accounts' : 'Pipeline';
+      return `🗂 ${where} · ${f.item.nextSteps || f.item.temperature}`;
+    }
     return itemTitle(f);
   };
 
@@ -475,7 +484,7 @@ export function TodayView({
           to: (b.type === 'call' ? b.contactPhone : b.contactEmail) || undefined,
           what: b.what || undefined,
           how: b.how || undefined,
-          note: chosen.length > 1 ? `Handled together: ${chosen.map((x) => PART_LABEL[x.kind] ?? x.kind).join(' + ')}` : undefined,
+          note: chosen.length > 1 ? `Handled together: ${chosen.map((x) => followUpKindLabel(x)).join(' + ')}` : undefined,
         },
       };
     });
@@ -485,7 +494,7 @@ export function TodayView({
     const head = c.outcome === 'no-answer' ? 'No answer' : c.outcome === 'close' ? 'Closed' : briefLabels(briefFor(chosen[0]).type).done;
     setUndo({
       token,
-      message: `${head} — ${row.company}: ${chosen.map((x) => PART_LABEL[x.kind] ?? x.kind).join(' + ')}${c.outcome !== 'close' && c.nextDate ? ` · next ${formatWeekday(c.nextDate)}` : ''}`,
+      message: `${head} — ${row.company}: ${chosen.map((x) => followUpKindLabel(x)).join(' + ')}${c.outcome !== 'close' && c.nextDate ? ` · next ${formatWeekday(c.nextDate)}` : ''}`,
     });
   };
 
@@ -506,7 +515,8 @@ export function TodayView({
           <button type="button" className="row-link" onClick={() => row.prospect && onOpenProspect(row.prospect.id)}>
             {row.company}
           </button>
-          : {row.parts.map((p) => PART_LABEL[p.kind] ?? p.kind).join(' + ')}
+          {row.prospect && is2027Account(row.prospect) ? <span className="chip year-2027">2027</span> : null}
+          : {row.parts.map((p) => followUpKindLabel(p)).join(' + ')}
           {row.prospect?.isExample ? <span className="example-badge">EXAMPLE</span> : null}
           <div className="group-parts">
             {row.parts.map((p) => (
@@ -595,7 +605,8 @@ export function TodayView({
           tabIndex={0}
         >
           <div className="title">
-            Prospect follow-up — {p.company}
+            {is2027Account(p) ? '2027 account follow-up' : 'Prospect follow-up'} — {p.company}
+            {is2027Account(p) ? <span className="chip year-2027">2027</span> : null}
             {p.isExample ? <span className="example-badge">EXAMPLE</span> : null}
             <div style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
               {p.nextSteps || p.contact || 'Open card'}
