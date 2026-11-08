@@ -1,33 +1,156 @@
-import { useState } from 'react';
-import type { Meeting, Priority, ProspectType, Temperature } from '../types';
+import { useMemo, useState } from 'react';
+import type { BookedBy, ColdLead, Meeting, Priority, Prospect, ProspectType, Temperature } from '../types';
+import type { BookPrefill } from '../nav';
+import { normCompany, searchProspects } from '../utils/company';
+import { is2027Account } from '../utils/accountSection';
 import { Modal } from './Modal';
 import { SegControl } from './SegControl';
 import { useStore } from '../store/StoreContext';
 import { todayISO } from '../utils/dates';
+import { DateInput } from './DateInput';
 
 const TEMPS: Temperature[] = ['Cold', 'Warm', 'Hot'];
 const PRIOS: Priority[] = [1, 2, 3, 4, 5];
 const TYPES: ProspectType[] = ['Prospect', 'Existing client'];
 
+/** Company box for the Book meeting form: suggests existing prospects / cold leads (never creates one). */
+function BookCompanyField({
+  company,
+  onCompany,
+  link,
+  onPick,
+  onUnlink,
+}: {
+  company: string;
+  onCompany: (v: string) => void;
+  link: { prospectId?: string | null; coldLeadId?: string | null };
+  onPick: (r: { kind: 'prospect'; item: Prospect } | { kind: 'coldlead'; item: ColdLead }) => void;
+  onUnlink: () => void;
+}) {
+  const { data } = useStore();
+  const [open, setOpen] = useState(false);
+  const linkedP = link.prospectId ? data.prospects.find((p) => p.id === link.prospectId) : undefined;
+  const linkedC = link.coldLeadId ? (data.coldLeads ?? []).find((c) => c.id === link.coldLeadId) : undefined;
+  const q = company.trim().toLowerCase();
+  const nq = normCompany(company);
+  const prospectMatches = useMemo(() => searchProspects(data, company, 6), [data, company]);
+  const coldMatches = useMemo(() => {
+    if (!q) return [];
+    return (data.coldLeads ?? [])
+      .filter((c) => c.status === 'Open' && (c.company.toLowerCase().includes(q) || (nq && normCompany(c.company).includes(nq))))
+      .slice(0, 4);
+  }, [data.coldLeads, q, nq]);
+  const none = !prospectMatches.length && !coldMatches.length;
+  return (
+    <div className="field">
+      <label>Company</label>
+      <div className="company-picker">
+        <input
+          value={company}
+          onChange={(e) => {
+            onCompany(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Acme Imports"
+          aria-label="Company"
+          role="combobox"
+          aria-expanded={open}
+          autoComplete="off"
+          autoFocus
+        />
+        {open && !none && !linkedP && !linkedC ? (
+          <ul className="company-options" role="listbox">
+            {prospectMatches.map((p) => (
+              <li key={p.id}>
+                <button type="button" role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => { onPick({ kind: 'prospect', item: p }); setOpen(false); }}>
+                  {p.company} <small>{is2027Account(p) ? '2027 Accounts' : 'Pipeline'} · {p.temperature}{p.contact ? ` · ${p.contact}` : ''}</small>
+                </button>
+              </li>
+            ))}
+            {coldMatches.map((c) => (
+              <li key={c.id}>
+                <button type="button" role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => { onPick({ kind: 'coldlead', item: c }); setOpen(false); }}>
+                  {c.company} <small>Cold lead{c.contactName ? ` · ${c.contactName}` : ''}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      {linkedP || linkedC ? (
+        <p className="field-hint book-link" data-testid="book-link">
+          🔗 Linked to {linkedP ? `${is2027Account(linkedP) ? '2027 account' : 'pipeline prospect'} “${linkedP.company}”` : `cold lead “${linkedC!.company}”`} — the meeting will show on their card.{' '}
+          <button type="button" className="link-btn" onClick={onUnlink}>unlink</button>
+        </p>
+      ) : (
+        <p className="field-hint">Not linked to a prospect — it won’t be added to the Pipeline either way.</p>
+      )}
+    </div>
+  );
+}
+
 export function BookMeetingForm({
   onClose,
   initialCompany,
+  prefill,
+  onBooked,
 }: {
   onClose: () => void;
   initialCompany?: string;
+  /** Opened from a prospect / cold lead: company, contact, email, phone, pairs + the link. */
+  prefill?: BookPrefill;
+  onBooked?: (m: Meeting) => void;
 }) {
   const { bookMeeting } = useStore();
-  const [company, setCompany] = useState(initialCompany ?? '');
-  const [contact, setContact] = useState('');
+  const [company, setCompany] = useState(prefill?.company ?? initialCompany ?? '');
+  const [contact, setContact] = useState(prefill?.contact ?? '');
+  const [contactEmail, setContactEmail] = useState(prefill?.contactEmail ?? '');
+  const [contactPhone, setContactPhone] = useState(prefill?.contactPhone ?? '');
+  const [link, setLink] = useState<{ prospectId?: string | null; coldLeadId?: string | null; name: string }>({
+    prospectId: prefill?.prospectId ?? null,
+    coldLeadId: prefill?.coldLeadId ?? null,
+    name: prefill?.company ?? '',
+  });
   const [meetingDate, setMeetingDate] = useState('');
   const [meetingTime, setMeetingTime] = useState('');
   const [timezone, setTimezone] = useState('Australia/Sydney');
   const [notes, setNotes] = useState('');
-  const [currencies, setCurrencies] = useState('');
+  const [currencies, setCurrencies] = useState(prefill?.currencies ?? '');
+  const [fxVolume, setFxVolume] = useState(prefill?.fxVolume ?? '');
+  const [bookedBy, setBookedBy] = useState<BookedBy>('Me');
+  const [bookedByName, setBookedByName] = useState('');
+
+  // The link only holds while the company name still matches the linked record.
+  const activeLink: { prospectId?: string | null; coldLeadId?: string | null } =
+    normCompany(company) && normCompany(company) === normCompany(link.name) ? link : {};
+
+  const changeCompany = (v: string) => {
+    setCompany(v);
+  };
+  const pick = (r: { kind: 'prospect'; item: Prospect } | { kind: 'coldlead'; item: ColdLead }) => {
+    setCompany(r.item.company);
+    if (r.kind === 'prospect') {
+      const p = r.item;
+      setLink({ prospectId: p.id, coldLeadId: null, name: p.company });
+      setContact((v) => v || p.contact || '');
+      setContactEmail((v) => v || p.contactEmail || '');
+      setContactPhone((v) => v || p.contactPhone || '');
+      setCurrencies((v) => v || p.currencyPairs || '');
+    } else {
+      const c = r.item;
+      setLink({ prospectId: null, coldLeadId: c.id, name: c.company });
+      setContact((v) => v || c.contactName || '');
+      setContactEmail((v) => v || c.contactEmail || '');
+      setContactPhone((v) => v || c.contactPhone || '');
+      setCurrencies((v) => v || c.volumeCurrency || '');
+    }
+  };
 
   const save = () => {
     if (!company.trim() || !meetingDate) return;
-    bookMeeting({
+    const m = bookMeeting({
       company: company.trim(),
       contact: contact.trim(),
       meetingDate,
@@ -35,7 +158,15 @@ export function BookMeetingForm({
       timezone,
       notes,
       currencies,
+      fxVolume,
+      bookedBy,
+      bookedByName: bookedBy === 'Me' ? '' : bookedByName.trim(),
+      prospectId: activeLink.prospectId ?? null,
+      coldLeadId: activeLink.coldLeadId ?? null,
+      contactEmail: contactEmail.trim(),
+      contactPhone: contactPhone.trim(),
     });
+    onBooked?.(m);
     onClose();
   };
 
@@ -56,18 +187,33 @@ export function BookMeetingForm({
     >
       <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 0 }}>
         Booking auto-creates a confirmation call task (2 days before) and confirmation email task (1 day before).
+        It stays in Upcoming meetings and only joins the Pipeline once you log it as attended.
       </p>
-      <div className="field">
-        <label>Company</label>
-        <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Acme Imports" autoFocus />
-      </div>
+      <BookedByFields bookedBy={bookedBy} setBookedBy={setBookedBy} name={bookedByName} setName={setBookedByName} />
+      <BookCompanyField
+        company={company}
+        onCompany={changeCompany}
+        link={activeLink}
+        onPick={pick}
+        onUnlink={() => setLink({ prospectId: null, coldLeadId: null, name: '' })}
+      />
       <div className="field">
         <label>Contact name (optional)</label>
         <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Jane Smith" />
       </div>
+      <div className="brief-contact-row">
+        <div className="field">
+          <label>Contact email (optional)</label>
+          <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="jane@company.com" autoComplete="off" />
+        </div>
+        <div className="field">
+          <label>Contact phone (optional)</label>
+          <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="04xx xxx xxx" autoComplete="off" />
+        </div>
+      </div>
       <div className="field">
         <label>Meeting date</label>
-        <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+        <DateInput value={meetingDate} onChange={setMeetingDate} aria-label="Meeting date" />
       </div>
       <div className="field">
         <label>Time (optional)</label>
@@ -87,6 +233,10 @@ export function BookMeetingForm({
       <div className="field">
         <label>Currency pairs (optional)</label>
         <input value={currencies} onChange={(e) => setCurrencies(e.target.value)} placeholder="AUDUSD" />
+      </div>
+      <div className="field">
+        <label>FX volume (optional)</label>
+        <input value={fxVolume} onChange={(e) => setFxVolume(e.target.value)} placeholder="e.g. ~AUD 5m / yr" />
       </div>
       <div className="field">
         <label>Notes</label>
@@ -111,8 +261,8 @@ export function LogMeetingForm({
   const [sufficient, setSufficient] = useState<boolean | null>(null);
   const [rating, setRating] = useState<Priority | null>(3);
   const [currencies, setCurrencies] = useState(meeting?.currencies ?? '');
-  const [fxVolume, setFxVolume] = useState('');
-  const [notes, setNotes] = useState('');
+  const [fxVolume, setFxVolume] = useState(meeting?.fxVolume ?? '');
+  const [notes, setNotes] = useState(meeting?.notes ?? '');
   const [nextFollowUp, setNextFollowUp] = useState('');
   const [temperature, setTemperature] = useState<Temperature>('Warm');
   const [priority, setPriority] = useState<Priority>(3);
@@ -168,7 +318,7 @@ export function LogMeetingForm({
       </div>
       <div className="field">
         <label>Meeting date</label>
-        <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+        <DateInput value={meetingDate} onChange={setMeetingDate} aria-label="Meeting date" />
       </div>
       <div className="field">
         <label>Outcome</label>
@@ -243,7 +393,7 @@ export function LogMeetingForm({
       </div>
       <div className="field">
         <label>Next follow-up date</label>
-        <input type="date" value={nextFollowUp} onChange={(e) => setNextFollowUp(e.target.value)} />
+        <DateInput value={nextFollowUp} onChange={setNextFollowUp} aria-label="Next follow-up date" />
       </div>
     </Modal>
   );
@@ -302,6 +452,72 @@ export function LogActivityForm({
         <label>Notes</label>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+    </Modal>
+  );
+}
+
+export function bookedByLabel(m: Pick<Meeting, 'bookedBy' | 'bookedByName'>): string {
+  const b = m.bookedBy ?? 'Me';
+  if (b === 'Me') return 'Me';
+  if (b === 'Daniel') return m.bookedByName || 'Daniel';
+  return m.bookedByName || 'Other associate';
+}
+
+export function BookedByFields({
+  bookedBy,
+  setBookedBy,
+  name,
+  setName,
+}: {
+  bookedBy: BookedBy;
+  setBookedBy: (b: BookedBy) => void;
+  name: string;
+  setName: (n: string) => void;
+}) {
+  return (
+    <>
+      <div className="field">
+        <label>Booked by</label>
+        <SegControl
+          options={[
+            { value: 'Me' as const, label: 'Me' },
+            { value: 'Daniel' as const, label: 'Daniel' },
+            { value: 'Other' as const, label: 'Other associate' },
+          ]}
+          value={bookedBy}
+          onChange={setBookedBy}
+        />
+      </div>
+      {bookedBy === 'Other' ? (
+        <div className="field">
+          <label>Associate name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sarah Lee" />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+export function EditBookedByForm({ meeting, onClose }: { meeting: Meeting; onClose: () => void }) {
+  const { updateMeeting } = useStore();
+  const [bookedBy, setBookedBy] = useState<BookedBy>(meeting.bookedBy ?? 'Me');
+  const [name, setName] = useState(meeting.bookedByName ?? '');
+  const save = () => {
+    updateMeeting(meeting.id, { bookedBy, bookedByName: bookedBy === 'Me' ? '' : name.trim() });
+    onClose();
+  };
+  return (
+    <Modal
+      title={`Booked by — ${meeting.company}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" onClick={save}>Save</button>
+        </>
+      }
+    >
+      <BookedByFields bookedBy={bookedBy} setBookedBy={setBookedBy} name={name} setName={setName} />
     </Modal>
   );
 }

@@ -1,4 +1,4 @@
-import { addDays, format, isBefore, isToday, parseISO, startOfDay } from 'date-fns';
+import { addBusinessDays, addDays, format, isBefore, isToday, parseISO, startOfDay } from 'date-fns';
 
 export function todayISO(): string {
   return format(new Date(), 'yyyy-MM-dd');
@@ -55,4 +55,18 @@ export function headerDate(): string {
 
 export function uid(): string {
   return crypto.randomUUID();
+}
+
+/** Mon–Fri business days (public holidays are not skipped). */
+export function addBusinessDaysISO(iso: string, days: number): string {
+  return format(addBusinessDays(parseISO(iso), days), 'yyyy-MM-dd');
+}
+
+export function formatWeekday(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  try {
+    return format(parseISO(iso), 'EEE d MMM');
+  } catch {
+    return iso;
+  }
 }
